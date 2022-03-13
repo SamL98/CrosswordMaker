@@ -1,3 +1,4 @@
-*.txt
+log.txt
+*.crossword
 .*.swp
 /__pycache__/
