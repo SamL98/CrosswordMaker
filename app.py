@@ -1,3 +1,4 @@
+from helper import *
 import argparse
 import termios
 import atexit
@@ -18,42 +19,6 @@ MR = '\u2524'
 BL = '\u2514'
 BM = '\u2534'
 BR = '\u2518'
-
-# (TL, TM, TR, ML, MR, BL, BM, BR, self)
-
-SIDE_TL = 0
-SIDE_TH = 0.1
-SIDE_LV = 0.2
-SIDE_TM = 1
-SIDE_TR = 2
-SIDE_ML = 3
-SIDE_MH = 3.1
-SIDE_MV = 3.2
-SIDE_MM = 4
-SIDE_MR = 5
-SIDE_BL = 6
-SIDE_BH = 6.1
-SIDE_RV = 6.2
-SIDE_BM = 7
-SIDE_BR = 8
-
-TO_BOLD = {
-    SIDE_TH: (HL, '\u2501'),
-    SIDE_MH: (HL, '\u2501', '\u2501', '\u2501'),
-    SIDE_BH: (HL, '\u2501'),
-    SIDE_LV: (VL, '\u2503'),
-    SIDE_MV: (VL, '\u2503', '\u2503', '\u2503'),
-    SIDE_RV: (VL, '\u2503'),
-    SIDE_TL: (TL, '\u250f'),
-    SIDE_TM: (TM, '\u2531', '\u2522', '\u2533'),
-    SIDE_TR: (TR, '\u2513'),
-    SIDE_ML: (ML, '\u2521', '\u2522', '\u2520'),
-    SIDE_MM: (MM, '\u2543', '\u2534', '\u2544', '\u2545', '\u2542', None, None, '\u2546', None, '\u2542'),
-    SIDE_MR: (MR, '\u2529', '\u252a', '\u2528'),
-    SIDE_BL: (BL, '\u2517'),
-    SIDE_BM: (BM, '\u2539', '\u253a', '\u2537'),
-    SIDE_BR: (BR, '\u251b')
-}
 
 H = 21
 W = 21
@@ -89,100 +54,100 @@ def log(*args):
     print(*args, file=log_file)
     log_file.flush()
 
-def is_part_of_word(squares, r, c, pos, d):
-    p = [min(pos[0], r), min(pos[1], c)]
-    sq_pos = [r, c]
-
-    while p[d] < DIMENSIONS[d] and p[d] < sq_pos[d]:
-        if isinstance(squares[p[0]][p[1]], BlackSquare):
-            return False
-
-        p[d] += 1
-
-    log(r, c, pos, d, p[d] == sq_pos[d])
-    return p[d] == sq_pos[d]
-
-def side_for(squares, r, c, pos, d, side):
-    idx = num = 0
-    cr, cc = int(side) // 3, int(side) % 3
-
-    for i in range(max(cr - 1, 0), min(cr + 1, 2)):
-        for j in range(max(cc - 1, 0), min(cc + 1, 2)):
-            idx |= is_part_of_word(squares, r + i - cr, c + j - cc, pos, d) << num
-            num += 1
-
-    log(r, c, side, idx)
-    log('')
-    return TO_BOLD[side][idx]
-
-def draw_square(square, spacing=3):
+def draw_square(square, highlighted, spacing=3):
     if isinstance(square, BlackSquare):
         sys.stdout.write('\u2588' * spacing)
-    elif square.letter is None:
-        sys.stdout.write('   ')
     else:
-        sys.stdout.write(' %s ' % square.letter)
+        if highlighted:
+            sys.stdout.write('\x1b[1;31m')
+
+        if square.letter is None:
+            sys.stdout.write('   ')
+        else:
+            sys.stdout.write(' %s ' % square.letter)
+
+        if highlighted:
+            sys.stdout.write('\x1b[0m')
 
 def draw_top(squares, pos, d, spacing=3):
-    sys.stdout.write(side_for(squares, 0, 0, pos, d, SIDE_TL))
-    sys.stdout.write(side_for(squares, 0, 0, pos, d, SIDE_TH) * spacing)
+    sys.stdout.write(TL)
+    sys.stdout.write(HL * spacing)
 
-    for c in range(1, W):
-        sys.stdout.write(side_for(squares, 0, c, pos, d, SIDE_TM))
-        sys.stdout.write(side_for(squares, 0, c, pos, d, SIDE_TH) * spacing)
+    for c in range(W - 1):
+        sys.stdout.write(TM)
+        sys.stdout.write(HL * spacing)
 
-    sys.stdout.write(side_for(squares, 0, W, pos, d, SIDE_TR) + '\n')
+    sys.stdout.write(TR + '\n')
 
-def draw_row(r, squares, pos, d, spacing=3):
-    left = SIDE_ML
-    middle = SIDE_MM
-    right = SIDE_MR
-    line = SIDE_MH
-    addend = '\n'
+def draw_row(r, squares, curr_word, pos, d, spacing=3):
+    left = ML
+    middle = MM
+    right = MR + '\n'
 
     if r == H - 1:
-        left = SIDE_BL
-        middle = SIDE_BM
-        right = SIDE_BR
-        line = SIDE_BH
-        addend = ''
+        left = BL
+        middle = BM
+        right = BR
 
-    sys.stdout.write(side_for(squares, r, 0, pos, d, SIDE_LV))
-    draw_square(squares[r][0], spacing)
+    for c in range(W):
+        sys.stdout.write(VL)
+        draw_square(squares[r][c], [r, c] in curr_word, spacing)
 
-    for c in range(1, W):
-        sys.stdout.write(side_for(squares, r, c, pos, d, SIDE_MV))
-        draw_square(squares[r][c], spacing)
+    sys.stdout.write(VL + '\n')
 
-    sys.stdout.write(side_for(squares, r, W, pos, d, SIDE_RV) + '\n')
+    sys.stdout.write(left)
+    sys.stdout.write(HL * spacing)
 
-    sys.stdout.write(side_for(squares, r + 1, 0, pos, d, left))
-    sys.stdout.write(side_for(squares, r + 1, 0, pos, d, line) * spacing)
+    for c in range(W - 1):
+        sys.stdout.write(middle)
+        sys.stdout.write(HL * spacing)
 
-    for c in range(1, W):
-        sys.stdout.write(side_for(squares, r + 1, c, pos, d, middle))
-        sys.stdout.write(side_for(squares, r + 1, c, pos, d, line) * spacing)
+    sys.stdout.write(right)
 
-    sys.stdout.write(side_for(squares, r + 1, W, pos, d, right))
-    sys.stdout.write(addend)
+def curr_word_indices(squares, pos, d):
+    idxs = []
+    p = pos[:]
+
+    while p[d] >= 0 and not isinstance(squares[p[0]][p[1]], BlackSquare):
+        idxs.insert(0, p[:])
+        p[d] -= 1
+
+    p = pos[:]
+    p[d] += 1
+
+    while p[d] < DIMENSIONS[d] and not isinstance(squares[p[0]][p[1]], BlackSquare):
+        idxs.append(p[:])
+        p[d] += 1
+
+    return idxs
 
 def draw(squares, pos, d):
     spacing = 3
+    curr_word = curr_word_indices(squares, pos, d)
 
     draw_top(squares, pos, d, spacing)
 
     for r in range(H):
-        draw_row(r, squares, pos, d, spacing)
+        draw_row(r, squares, curr_word, pos, d, spacing)
 
     sys.stdout.write('\x1b[0J')
 
-    sys.stdout.write('\x1b[%dA' % (H * 2))
-    sys.stdout.write('\x1b[%dD' % (W * 4))
+
+def display_recommendations(recs):
+    sys.stdout.write('\x1b[H')
+    sys.stdout.write('\x1b[%dB' % 1)
+    sys.stdout.write('\x1b[%dC' % (W * 4 + 3))
+
+    for rec in recs:
+        sys.stdout.write(rec)
+        sys.stdout.write('\x1b[%dD' % len(rec))
+        sys.stdout.write('\x1b[1B')
 
 
 def position_cursor(pos):
+    sys.stdout.write('\x1b[H')
     sys.stdout.write('\x1b[%dB' % ((pos[0] * 2) + 1))
-    sys.stdout.write('\x1b[%dC' % ((pos[1] * 4) + 1))
+    sys.stdout.write('\x1b[%dC' % ((pos[1] * 4) + 2))
 
 
 def increment_cursor(pos, d):
@@ -295,6 +260,7 @@ if args.saved_file is not None:
 
 cursor = [0, 0]
 direction = 1
+recs = []
 
 sys.stdout.write('\x1b[2J')
 sys.stdout.flush()
@@ -304,6 +270,7 @@ while True:
     sys.stdout.flush()
 
     draw(squares, cursor, direction)
+    display_recommendations(recs)
     position_cursor(cursor)
 
     sys.stdout.flush()
@@ -320,7 +287,16 @@ while True:
             break
 
         elif ch == 'R':
-            n = calc_word_len(squares, cursor, direction)
+            curr_word = curr_word_indices(squares, cursor, direction)
+            constraints = []
+
+            for i, ix in enumerate(curr_word):
+                sq = squares[ix[0]][ix[1]]
+
+                if sq.letter is not None:
+                    constraints.append((i, sq.letter))
+
+            recs = get_matches(constraints, len(curr_word))
             break
 
         elif ch == 'X':
