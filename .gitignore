@@ -1,4 +1,3 @@
 *.txt
 .*.swp
-/answers/
 /__pycache__/

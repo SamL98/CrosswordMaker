@@ -1,5 +1,5 @@
+from collections import defaultdict
 from glob import glob
-import os
 
 end = '_end_'
 
@@ -17,16 +17,19 @@ def construct_trie(words):
     return root
 
 
-all_words = []
+#all_words = []
+words = defaultdict(list)
 
 for fname in glob('answers/*.txt'):
     with open(fname) as f:
-        all_words.extend(f.read().split(','))
+        #all_words.extend(f.read().split(','))
+        for word in f.read().split(','):
+            words[len(word)].append(word)
 
 #trie = construct_trie(all_words)
 
 
-def get_matches(constraints, n):
+def get_matches(constraints, n, maxlen=20):
     '''
     node = trie
     i = 0
@@ -38,9 +41,10 @@ def get_matches(constraints, n):
     matches = []
     '''
 
-    matches = [word for word in all_words if len(word) == n]
+    #matches = [word for word in all_words if len(word) == n]
+    matches = words[n]
 
     for i, ch in constraints:
         matches = [word for word in matches if word[i] == ch]
 
-    return matches[:min(len(matches), 20)]
+    return matches[:min(len(matches), maxlen)]

@@ -133,14 +133,19 @@ def draw(squares, pos, d):
     sys.stdout.write('\x1b[0J')
 
 
-def display_recommendations(recs):
+def display_recommendations(recs, maxlen=20):
     sys.stdout.write('\x1b[H')
-    sys.stdout.write('\x1b[%dB' % 1)
+    sys.stdout.write('\x1b[1B')
     sys.stdout.write('\x1b[%dC' % (W * 4 + 3))
 
     for rec in recs:
         sys.stdout.write(rec)
+        sys.stdout.write('\x1b[0K')
         sys.stdout.write('\x1b[%dD' % len(rec))
+        sys.stdout.write('\x1b[1B')
+
+    for _ in range(maxlen - len(recs)):
+        sys.stdout.write('\x1b[0K')
         sys.stdout.write('\x1b[1B')
 
 
@@ -260,7 +265,10 @@ if args.saved_file is not None:
 
 cursor = [0, 0]
 direction = 1
+constraints = []
+word_len = 0
 recs = []
+max_num_recs = 20
 
 sys.stdout.write('\x1b[2J')
 sys.stdout.flush()
@@ -270,7 +278,7 @@ while True:
     sys.stdout.flush()
 
     draw(squares, cursor, direction)
-    display_recommendations(recs)
+    display_recommendations(recs, max_num_recs)
     position_cursor(cursor)
 
     sys.stdout.flush()
@@ -296,7 +304,37 @@ while True:
                 if sq.letter is not None:
                     constraints.append((i, sq.letter))
 
-            recs = get_matches(constraints, len(curr_word))
+            word_len = len(curr_word)
+            recs = get_matches(constraints, word_len, max_num_recs)
+
+            if len(recs) == 0:
+                recs = ['No matches found.']
+
+            break
+
+        elif ch == 'F':
+            curr_word = curr_word_indices(squares, cursor, direction)
+            constraints = []
+
+            for i, ix in enumerate(curr_word):
+                sq = squares[ix[0]][ix[1]]
+
+                if sq.letter is not None:
+                    constraints.append((i, sq.letter))
+
+            word_len = len(curr_word)
+            n = word_len
+
+            while len(recs) < max_num_recs:
+                recs.extend(get_matches(constraints, n, max_num_recs))
+                n -= 1
+
+                while len(constraints) > 0 and constraints[-1][0] >= n:
+                    constraints.pop(-1)
+
+            if len(recs) == 0:
+                recs = ['No matches found.']
+
             break
 
         elif ch == 'X':
